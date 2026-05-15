@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\Booking\BookingOverlapException;
+use App\Exceptions\Booking\MissingBookingFilterException;
 use App\Exceptions\Booking\RoomNotFoundException;
 use App\Models\Booking;
 use App\Models\Room;
@@ -24,6 +25,19 @@ class BookingService
             'starts_at' => $startsAt,
             'ends_at'   => $endsAt,
         ]);
+    }
+
+    public function getBookings(?int $roomId, ?int $userId): Collection
+    {
+        if ($roomId !== null) {
+            return $this->getBookingsByRoom($roomId);
+        }
+
+        if ($userId !== null) {
+            return $this->getBookingsByUser($userId);
+        }
+
+        throw new MissingBookingFilterException();
     }
 
     public function getBookingsByUser(int $userId): Collection

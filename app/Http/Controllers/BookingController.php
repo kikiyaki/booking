@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\Booking\BookingOverlapException;
+use App\Exceptions\Booking\MissingBookingFilterException;
 use App\Exceptions\Booking\RoomNotFoundException;
 use App\Http\Requests\StoreBookingRequest;
 use App\Models\Room;
@@ -23,8 +24,8 @@ class BookingController extends Controller
     {
         try {
             $booking = $this->bookingService->storeBooking(
-                $request->integer('room_id'),
-                $request->integer('user_id'),
+                (int) $request->input('room_id'),
+                (int) $request->input('user_id'),
                 $request->input('starts_at'),
                 $request->input('ends_at')
             );
@@ -38,11 +39,14 @@ class BookingController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $bookings = $request->has('room_id')
-                ? $this->bookingService->getBookingsByRoom($request->integer('room_id'))
-                : $this->bookingService->getBookingsByUser($request->integer('user_id'));
+            $bookings = $this->bookingService->getBookings(
+                $request->has('room_id') ? (int) $request->query('room_id') : null,
+                $request->has('user_id') ? (int) $request->query('user_id') : null,
+            );
 
             return response()->json($bookings);
+        } catch (MissingBookingFilterException $e) {
+            return response()->json(['message' => $e->getMessage()], 401);
         } catch (RoomNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
