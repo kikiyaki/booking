@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Booking\BookingOverlapException;
+use App\Exceptions\Booking\RoomNotFoundException;
 use App\Http\Requests\StoreBookingRequest;
 use App\Models\Room;
 use App\Services\BookingService;
@@ -19,37 +21,31 @@ class BookingController extends Controller
 
     public function store(StoreBookingRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        try {
+            $booking = $this->bookingService->storeBooking(
+                $request->integer('room_id'),
+                $request->integer('user_id'),
+                $request->input('starts_at'),
+                $request->input('ends_at')
+            );
 
-        if ($this->bookingService->checkBookingsOverlap($data['room_id'], $data['starts_at'], $data['ends_at'])) {
-            return response()->json(['message' => 'The room is already booked for this time slot.'], 409);
+            return response()->json($booking, 201);
+        } catch (BookingOverlapException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
         }
-
-        $booking = $this->bookingService->storeBooking(
-            $data['room_id'],
-            $data['user_id'],
-            $data['starts_at'],
-            $data['ends_at']
-        );
-
-        return response()->json($booking, 201);
     }
 
     public function index(Request $request): JsonResponse
     {
-        if ($request->has('room_id')) {
-            $room = Room::find($request->query('room_id'));
+        try {
+            $bookings = $request->has('room_id')
+                ? $this->bookingService->getBookingsByRoom($request->integer('room_id'))
+                : $this->bookingService->getBookingsByUser($request->integer('user_id'));
 
-            if (!$room) {
-                return response()->json(['message' => 'Room not found.'], 404);
-            }
-
-            return response()->json($this->bookingService->getBookingsByRoom($room->id));
+            return response()->json($bookings);
+        } catch (RoomNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
         }
-
-        return response()->json(
-            $this->bookingService->getBookingsByUser((int) $request->query('user_id'))
-        );
     }
 
     public function rooms(): JsonResponse
