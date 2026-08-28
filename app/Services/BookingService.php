@@ -18,24 +18,29 @@ class BookingService
 
         DB::beginTransaction();
 
-        Room::query()
-            ->lockForUpdate()
-            ->find($roomId);
+        try {
+            Room::query()
+                ->lockForUpdate()
+                ->find($roomId);
 
-        if ($this->checkBookingsOverlap($roomId, $startsAt, $endsAt)) {
-            throw new BookingOverlapException();
+            if ($this->checkBookingsOverlap($roomId, $startsAt, $endsAt)) {
+                throw new BookingOverlapException();
+            }
+
+            $createdBooking = Booking::create([
+                'room_id' => $roomId,
+                'user_id' => $userId,
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+            ]);
+
+            DB::commit();
+
+            return $createdBooking;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
         }
-
-        $createdBooking = Booking::create([
-            'room_id' => $roomId,
-            'user_id' => $userId,
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-        ]);
-
-        DB::commit();
-
-        return $createdBooking;
     }
 
     private function ensureRoomExists(int $roomId): void
