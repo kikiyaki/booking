@@ -8,6 +8,7 @@ use App\Exceptions\Booking\RoomNotFoundException;
 use App\Models\Booking;
 use App\Models\Room;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class BookingService
 {
@@ -15,41 +16,26 @@ class BookingService
     {
         $this->ensureRoomExists($roomId);
 
+        DB::beginTransaction();
+
+        Room::query()
+            ->lockForUpdate()
+            ->find($roomId);
+
         if ($this->checkBookingsOverlap($roomId, $startsAt, $endsAt)) {
             throw new BookingOverlapException();
         }
 
-        return Booking::create([
-            'room_id'   => $roomId,
-            'user_id'   => $userId,
+        $createdBooking = Booking::create([
+            'room_id' => $roomId,
+            'user_id' => $userId,
             'starts_at' => $startsAt,
-            'ends_at'   => $endsAt,
+            'ends_at' => $endsAt,
         ]);
-    }
 
-    public function getBookings(?int $roomId, ?int $userId): Collection
-    {
-        if ($roomId !== null) {
-            return $this->getBookingsByRoom($roomId);
-        }
+        DB::commit();
 
-        if ($userId !== null) {
-            return $this->getBookingsByUser($userId);
-        }
-
-        throw new MissingBookingFilterException();
-    }
-
-    public function getBookingsByUser(int $userId): Collection
-    {
-        return Booking::where('user_id', $userId)->get();
-    }
-
-    public function getBookingsByRoom(int $roomId): Collection
-    {
-        $this->ensureRoomExists($roomId);
-
-        return Booking::where('room_id', $roomId)->get();
+        return $createdBooking;
     }
 
     private function ensureRoomExists(int $roomId): void
@@ -65,5 +51,30 @@ class BookingService
             ->where('starts_at', '<', $endsAt)
             ->where('ends_at', '>', $startsAt)
             ->exists();
+    }
+
+    public function getBookings(?int $roomId, ?int $userId): Collection
+    {
+        if ($roomId !== null) {
+            return $this->getBookingsByRoom($roomId);
+        }
+
+        if ($userId !== null) {
+            return $this->getBookingsByUser($userId);
+        }
+
+        throw new MissingBookingFilterException();
+    }
+
+    public function getBookingsByRoom(int $roomId): Collection
+    {
+        $this->ensureRoomExists($roomId);
+
+        return Booking::where('room_id', $roomId)->get();
+    }
+
+    public function getBookingsByUser(int $userId): Collection
+    {
+        return Booking::where('user_id', $userId)->get();
     }
 }
