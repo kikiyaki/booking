@@ -14,14 +14,15 @@ class BookingService
 {
     public function storeBooking(int $roomId, int $userId, string $startsAt, string $endsAt): Booking
     {
-        $this->ensureRoomExists($roomId);
-
         DB::beginTransaction();
 
         try {
-            Room::query()
+            $room = Room::query()
                 ->lockForUpdate()
                 ->find($roomId);
+            if (!$room) {
+                throw new RoomNotFoundException($roomId);
+            }
 
             if ($this->checkBookingsOverlap($roomId, $startsAt, $endsAt)) {
                 throw new BookingOverlapException();

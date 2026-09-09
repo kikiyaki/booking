@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(php|ts|js\\)$\")",
+      "Bash(git *)"
+    ]
+  }
+}
